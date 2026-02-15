@@ -1,26 +1,31 @@
-const mongoose = require("./connection.js")
+const mongoose = require("mongoose");
 
-// create Address model schema
-const addressSchema = new mongoose.Schema(
-{
-  _id: ObjectId,
-  userId: ObjectId, // 'User', indexed
-  fullName: String,
-  phone: String,
-  addressLine1: String,
-  addressLine2: String,
-  city: String,
-  state: String,
-  postalCode: String,
-  country: String,
-  isDefault: Boolean,
-  addressType: String, // 'home', 'work', 'other'
-  createdAt: Date,
-  updatedAt: Date
-})
+const { Schema } = mongoose;
 
-// create Address model
-const Address = mongoose.model("Adress", addressSchema)
+const addressSchema = new Schema(
+  {
+    userId: {
+      type: Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+      index: true,
+    },
+    fullName:     { type: String, required: true },
+    phone:        { type: String, required: true },
+    addressLine1: { type: String, required: true },
+    addressLine2: { type: String },
+    city:         { type: String, required: true },
+    state:        { type: String, required: true },
+    postalCode:   { type: String, required: true },
+    country:      { type: String, required: true, default: "Canada" },
+    isDefault:    { type: Boolean, default: false },
+    addressType:  {
+      type: String,
+      enum: ["home", "work", "other"],
+      default: "home",
+    },
+  },
+  { timestamps: true }
+);
 
-// export Address model
-module.exports = Address
+module.exports = mongoose.model("Address", addressSchema);

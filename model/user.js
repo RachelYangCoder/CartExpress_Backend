@@ -1,33 +1,58 @@
-const mongoose = require("./connection.js")
+const mongoose = require("mongoose");
+const bcrypt = require("bcryptjs");
 
-// create User model schema
-const userSchema = new mongoose.Schema(
-    {
-  _id: ObjectId,
-  email: String, 
-  password: String,
-  firstName: String,
-  lastName: String,
-  phone: String,
-  role: String, // 'customer', 'admin', 'vendor'
-  isEmailVerified: Boolean, 
-  emailVerificationToken: String,
-  passwordResetToken: String,
-  passwordResetExpires: Date,
-  avatar: String,
-  isActive: Boolean,
-  lastLogin: Date,
-  createdAt: Date,
-  updatedAt: Date
-})
+const { Schema } = mongoose;
 
-// Indexes
-db.inventoryLogs.createIndex({ productId: 1 })
-db.inventoryLogs.createIndex({ type: 1 })
-db.inventoryLogs.createIndex({ createdAt: -1 })
+const userSchema = new Schema(
+  {
+    email: {
+      type: String,
+      required: [true, "Email is required"],
+      unique: true,
+      lowercase: true,
+      trim: true,
+      index: true,
+    },
+    password: {
+      type: String,
+      required: [true, "Password is required"],
+      minlength: 6,
+      select: false, // Never return password in queries by default
+    },
+    firstName: { type: String, required: true, trim: true },
+    lastName:  { type: String, required: true, trim: true },
+    phone:     { type: String, trim: true },
+    role: {
+      type: String,
+      enum: ["customer", "admin", "vendor"],
+      default: "customer",
+    },
+    isEmailVerified:       { type: Boolean, default: false },
+    emailVerificationToken:{ type: String,  select: false },
+    passwordResetToken:    { type: String,  select: false },
+    passwordResetExpires:  { type: Date,    select: false },
+    avatar:   { type: String },
+    isActive: { type: Boolean, default: true, index: true },
+    lastLogin:{ type: Date },
+  },
+  { timestamps: true }
+);
 
-// create User model
-const User = mongoose.model("User", userSchema)
+// Hash password before saving
+userSchema.pre("save", async function (next) {
+  if (!this.isModified("password")) return next();
+  this.password = await bcrypt.hash(this.password, 12);
+  next();
+});
 
-// export User model
-module.exports = User
+// Instance method: compare password
+userSchema.methods.comparePassword = async function (candidatePassword) {
+  return bcrypt.compare(candidatePassword, this.password);
+};
+
+// Virtual: full name
+userSchema.virtual("fullName").get(function () {
+  return `${this.firstName} ${this.lastName}`;
+});
+
+module.exports = mongoose.model("User", userSchema);

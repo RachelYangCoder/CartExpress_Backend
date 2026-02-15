@@ -1,23 +1,25 @@
-const mongoose = require("./connection.js")
+const mongoose = require("mongoose");
 
-// create Address model schema
-const categloriesSchema = new mongoose.Schema({
-  _id: ObjectId,
-  name: String, // unique, indexed
-  slug: String, // unique, indexed
-  description: String,
-  image: String,
-  parentCategoryId: ObjectId, // ref: 'Category', indexed
-  isActive: Boolean,
-  sortOrder: Number,
-  metaTitle: String,
-  metaDescription: String,
-  createdAt: Date,
-  updatedAt: Date
-})
+const { Schema } = mongoose;
 
-// create Address model
-const Categlories = mongoose.model("Categlories", categloriesSchema)
+const categorySchema = new Schema(
+  {
+    name: { type: String, required: true, unique: true, trim: true, index: true },
+    slug: { type: String, required: true, unique: true, lowercase: true, index: true },
+    description:     { type: String },
+    image:           { type: String },
+    parentCategoryId:{
+      type: Schema.Types.ObjectId,
+      ref: "Category",
+      default: null,
+      index: true,
+    },
+    isActive:        { type: Boolean, default: true, index: true },
+    sortOrder:       { type: Number, default: 0 },
+    metaTitle:       { type: String },
+    metaDescription: { type: String },
+  },
+  { timestamps: true }
+);
 
-// export Address model
-module.exports = Categlories
+module.exports = mongoose.model("Category", categorySchema);

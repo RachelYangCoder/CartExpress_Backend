@@ -1,33 +1,25 @@
-const mongoose = require("./connection.js")
+const mongoose = require("mongoose");
 
-// create Address model schema
-const reviewSchema = new mongoose.Schema({
-  _id: ObjectId,
-  productId: ObjectId, // ref: 'Product', indexed
-  userId: ObjectId, // ref: 'User', indexed
-  orderId: ObjectId, // ref: 'Order'
-  rating: Number, // 1-5, indexed
-  title: String,
-  comment: String,
-  images: [String],
-  isVerifiedPurchase: Boolean,
-  isApproved: Boolean, // indexed
-  helpfulCount: Number,
-  reportCount: Number,
-  createdAt: Date,
-  updatedAt: Date
-})
+const { Schema } = mongoose;
 
-// Indexes
-db.reviews.createIndex({ productId: 1 })
-db.reviews.createIndex({ userId: 1 })
-db.reviews.createIndex({ rating: 1 })
-db.reviews.createIndex({ isApproved: 1 })
-db.reviews.createIndex({ createdAt: -1 })
-db.reviews.createIndex({ productId: 1, userId: 1, orderId: 1 }, { unique: true })
+const reviewSchema = new Schema(
+  {
+    productId: { type: Schema.Types.ObjectId, ref: "Product", required: true, index: true },
+    userId:    { type: Schema.Types.ObjectId, ref: "User",    required: true, index: true },
+    orderId:   { type: Schema.Types.ObjectId, ref: "Order",   required: true },
+    rating:    { type: Number, required: true, min: 1, max: 5, index: true },
+    title:     { type: String, trim: true },
+    comment:   { type: String, trim: true },
+    images:    [{ type: String }],
+    isVerifiedPurchase: { type: Boolean, default: false },
+    isApproved:         { type: Boolean, default: false, index: true },
+    helpfulCount:       { type: Number, default: 0 },
+    reportCount:        { type: Number, default: 0 },
+  },
+  { timestamps: true }
+);
 
-// create Address model
-const Review = mongoose.model("Review", reviewSchema)
+// One review per user per product per order
+reviewSchema.index({ productId: 1, userId: 1, orderId: 1 }, { unique: true });
 
-// export Address model
-module.exports = Review
+module.exports = mongoose.model("Review", reviewSchema);

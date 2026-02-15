@@ -1,44 +1,44 @@
-const mongoose = require("./connection.js")
+const mongoose = require("mongoose");
 
-// create payment model schema
-const paymentSchema = new mongoose.Schema({
-  _id: ObjectId,
-  orderId: ObjectId, // ref: 'Order', indexed
-  userId: ObjectId, // ref: 'User', indexed
-  amount: Number,
-  currency: String,
-  paymentMethod: String, // enum: 'credit_card', 'debit_card', 'paypal', 'stripe', etc.
-  paymentGateway: String,
-  transactionId: String, // unique, indexed
-  paymentIntentId: String,
-  status: String, // enum: 'pending', 'processing', 'completed', 'failed', 'refunded'
-  
-  paymentDetails: {
-    cardLast4: String,
-    cardBrand: String,
-    cardExpMonth: Number,
-    cardExpYear: Number
+const { Schema } = mongoose;
+
+const paymentSchema = new Schema(
+  {
+    orderId: { type: Schema.Types.ObjectId, ref: "Order", required: true, index: true },
+    userId:  { type: Schema.Types.ObjectId, ref: "User",  required: true, index: true },
+    amount:  { type: Number, required: true },
+    currency:{ type: String, default: "usd", uppercase: true },
+    paymentMethod: {
+      type: String,
+      enum: ["credit_card", "debit_card", "paypal", "stripe", "apple_pay", "google_pay"],
+      required: true,
+    },
+    paymentGateway:  { type: String, default: "stripe" },
+    // Stripe IDs
+    stripePaymentIntentId: { type: String, unique: true, sparse: true, index: true },
+    stripeChargeId:        { type: String },
+    transactionId:         { type: String, unique: true, sparse: true, index: true },
+    status: {
+      type: String,
+      enum: ["pending", "processing", "completed", "failed", "refunded", "partially_refunded"],
+      default: "pending",
+      index: true,
+    },
+    // Masked card details (never store full card numbers)
+    paymentDetails: {
+      cardLast4:    { type: String },
+      cardBrand:    { type: String },
+      cardExpMonth: { type: Number },
+      cardExpYear:  { type: Number },
+    },
+    refundAmount:        { type: Number, default: 0 },
+    refundTransactionId: { type: String },
+    refundedAt:          { type: Date },
+    failureReason:       { type: String },
+    metadata:            { type: Map, of: String },
+    paidAt:              { type: Date },
   },
-  
-  refundAmount: Number,
-  refundTransactionId: String,
-  refundedAt: Date,
-  failureReason: String,
-  metadata: Object,
-  paidAt: Date,
-  createdAt: Date,
-  updatedAt: Date
-})
+  { timestamps: true }
+);
 
-// Indexes
-db.payments.createIndex({ orderId: 1 })
-db.payments.createIndex({ userId: 1 })
-db.payments.createIndex({ transactionId: 1 }, { unique: true })
-db.payments.createIndex({ status: 1 })
-db.payments.createIndex({ createdAt: -1 })
-
-// create Address model
-const Payment = mongoose.model("Payment", paymentSchema)
-
-// export Address model
-module.exports = Payment
+module.exports = mongoose.model("Payment", paymentSchema);

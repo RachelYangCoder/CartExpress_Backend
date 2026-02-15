@@ -1,22 +1,26 @@
-const mongoose = require("./connection.js")
+const mongoose = require("mongoose");
 
-// create Address model schema
-const inventorySchema = new mongoose.Schema({
-  _id: ObjectId,
-  productId: ObjectId, // ref: 'Product', indexed
-  variantId: ObjectId,
-  type: String, // 'sale', 'restock', 'adjustment', 'return', 'damage'
-  quantity: Number,
-  previousStock: Number,
-  newStock: Number,
-  orderId: ObjectId, // ref: 'Order'
-  reason: String,
-  performedBy: ObjectId, // ref: 'User'
-  createdAt: Date
-})
+const { Schema } = mongoose;
 
-// create Address model
-const Inventory = mongoose.model("Inventory", inventorySchema)
+const inventorySchema = new Schema(
+  {
+    productId: { type: Schema.Types.ObjectId, ref: "Product", required: true, index: true },
+    variantId:  { type: Schema.Types.ObjectId },
+    type: {
+      type: String,
+      enum: ["sale", "restock", "adjustment", "return", "damage"],
+      required: true,
+      index: true,
+    },
+    quantity:      { type: Number, required: true }, // can be negative (e.g. sale)
+    previousStock: { type: Number, required: true },
+    newStock:      { type: Number, required: true },
+    orderId:       { type: Schema.Types.ObjectId, ref: "Order" },
+    reason:        { type: String },
+    performedBy:   { type: Schema.Types.ObjectId, ref: "User" },
+  },
+  { timestamps: true }
+);
 
-// export Address model
-module.exports = Inventory
+// Note: inventory log is append-only — no updates, only inserts
+module.exports = mongoose.model("InventoryLog", inventorySchema);

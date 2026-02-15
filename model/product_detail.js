@@ -1,66 +1,59 @@
-const mongoose = require("./connection.js")
+const mongoose = require("mongoose");
 
-// create Address model schema
-const categloriesSchema = new mongoose.Schema({
-  _id: ObjectId,
-  name: String,
-  slug: String, 
-  description: String,
-  shortDescription: String,
-  sku: String,
-  price: Number,
-  comparePrice: Number,
-  costPrice: Number,
-  categoryId: ObjectId, 
-  images: [String], // array of URLs
-  thumbnail: String,
-  stockQuantity: Number,
-  lowStockThreshold: Number,
-  weight: Number,
-  dimensions: {
-    length: Number,
-    width: Number,
-    height: Number,
-    unit: String
+const { Schema } = mongoose;
+
+const variantSchema = new Schema({
+  name:          { type: String, required: true },
+  sku:           { type: String, required: true },
+  price:         { type: Number, required: true, min: 0 },
+  stockQuantity: { type: Number, default: 0, min: 0 },
+  attributes:    { type: Map, of: String }, // e.g. { color: "red", size: "M" }
+  image:         { type: String },
+  isActive:      { type: Boolean, default: true },
+});
+
+const productSchema = new Schema(
+  {
+    name:             { type: String, required: true, trim: true },
+    slug:             { type: String, required: true, unique: true, lowercase: true, index: true },
+    description:      { type: String },
+    shortDescription: { type: String },
+    sku:              { type: String, required: true, unique: true, index: true },
+    price:            { type: Number, required: true, min: 0, index: true },
+    comparePrice:     { type: Number, min: 0 }, // original/crossed-out price
+    costPrice:        { type: Number, min: 0 }, // internal cost
+    categoryId: {
+      type: Schema.Types.ObjectId,
+      ref: "Category",
+      index: true,
+    },
+    images:           [{ type: String }],
+    thumbnail:        { type: String },
+    stockQuantity:    { type: Number, default: 0, min: 0 },
+    lowStockThreshold:{ type: Number, default: 5 },
+    weight:           { type: Number },
+    dimensions: {
+      length: { type: Number },
+      width:  { type: Number },
+      height: { type: Number },
+      unit:   { type: String, enum: ["cm", "in"], default: "cm" },
+    },
+    isFeatured:      { type: Boolean, default: false, index: true },
+    isActive:        { type: Boolean, default: true, index: true },
+    tags:            [{ type: String }],
+    variants:        [variantSchema],
+    specifications:  { type: Map, of: String },
+    metaTitle:       { type: String },
+    metaDescription: { type: String },
+    metaKeywords:    { type: String },
+    averageRating:   { type: Number, default: 0, min: 0, max: 5 },
+    totalReviews:    { type: Number, default: 0 },
+    totalSales:      { type: Number, default: 0 },
   },
-  isFeatured: Boolean, // indexed
-  isActive: Boolean, // indexed
-  tags: [String], // text indexed
-  variants: [
-    {
-      _id: ObjectId,
-      name: String,
-      sku: String,
-      price: Number,
-      stockQuantity: Number,
-      attributes: Object,
-      image: String,
-      isActive: Boolean
-    }
-  ],
-  specifications: Object,
-  metaTitle: String,
-  metaDescription: String,
-  metaKeywords: String,
-  averageRating: Number,
-  totalReviews: Number,
-  totalSales: Number,
-  createdAt: Date,
-  updatedAt: Date
-})
+  { timestamps: true }
+);
 
-// Indexes
-db.products.createIndex({ slug: 1 }, { unique: true })
-db.products.createIndex({ sku: 1 }, { unique: true })
-db.products.createIndex({ categoryId: 1 })
-db.products.createIndex({ isActive: 1 })
-db.products.createIndex({ isFeatured: 1 })
-db.products.createIndex({ price: 1 })
-db.products.createIndex({ createdAt: -1 })
-db.products.createIndex({ name: "text", description: "text", tags: "text" })
+// Text index for search
+productSchema.index({ name: "text", description: "text", tags: "text" });
 
-// create Address model
-const Categlories = mongoose.model("Categlories", categloriesSchema)
-
-// export Address model
-module.exports = Categlories
+module.exports = mongoose.model("Product", productSchema);
