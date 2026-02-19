@@ -17,7 +17,9 @@ const connectDB = async () => {
 
     return mongoose.connection;
   } catch (error) {
-    console.error("Database connection failed:", error.message);
+    console.warn("⚠ MongoDB not connected:", error.message);
+    console.warn("⚠ Server is running but DB-dependent routes will return errors.");
+    console.warn("⚠ Set DATABASE_URL in .env and start MongoDB to enable full functionality.");
     return null;
   }
 };
