@@ -1,4 +1,4 @@
-# 🛒 CartExpress - Quick Start Guide
+# CartExpress - Quick Start Guide
 
 ## Current state
 
@@ -9,50 +9,22 @@
 
 ## Prerequisites
 
-- Node.js v14+ 
-- MongoDB (local or MongoDB Atlas)
+- Node.js v18+
+- MongoDB (local or MongoDB Atlas) — optional to start, required for data
 
-## Installation
-
-### 1. Backend Setup (Port 4000)
+## Installation & Running
 
 ```bash
+git clone -b pablo-wip https://github.com/RachelYangCoder/CartExpress_Backend.git
 cd CartExpress_Backend
-
-# Install dependencies
 npm install
-
-# Create .env file
-cp .env.example .env
-
-# Edit .env and set your MongoDB URL
-# Example: DATABASE_URL=mongodb://localhost:27017/cartexpress
-```
-
-### 2. Frontend Setup (Port 3000)
-
-```bash
-cd CartExpress_Frontend
-
-# Install dependencies
-npm install
-```
-
-## Running the Application
-
-### Terminal 1 - Start Backend Server
-```bash
-cd CartExpress_Backend
 npm run dev
-# Server running on http://localhost:4000
 ```
 
-### Terminal 2 - Start Frontend App
-```bash
-cd CartExpress_Frontend
-npm run dev
-# App running on http://localhost:3000
-```
+- `npm install` installs backend dependencies and auto-creates `.env` from `.env.example`
+- `npm run dev` installs frontend dependencies on first run, then starts both servers
+- **Backend** → http://localhost:4000
+- **Frontend** → http://localhost:3000
 
 ## Project Structure
 
@@ -64,18 +36,17 @@ CartExpress_Backend/
 ├── routes/        → API endpoints
 ├── server.js      → Main server file
 ├── package.json   → Dependencies
-└── .env.example   → Environment template
-
-CartExpress_Frontend/
-├── src/
-│   ├── components/    → Reusable components
-│   ├── pages/         → Page components
-│   ├── services/      → API communication
-│   ├── App.jsx        → Main app component
-│   └── index.css      → Global styles
-├── index.html     → Entry point
-├── vite.config.js → Vite configuration
-└── package.json   → Dependencies
+├── .env.example   → Environment template
+└── CartExpress_Frontend/
+    ├── src/
+    │   ├── components/    → Reusable components
+    │   ├── pages/         → Page components
+    │   ├── services/      → API communication
+    │   ├── App.jsx        → Main app component
+    │   └── index.css      → Global styles
+    ├── index.html     → Entry point
+    ├── vite.config.js → Vite configuration
+    └── package.json   → Dependencies
 ```
 
 ## API Endpoints Overview
@@ -103,18 +74,15 @@ CartExpress_Frontend/
 ## Features
 
 ### Customer Features
-- Browse products with search
-- View product details & variants
-- Add/remove items from cart
+- Browse products with search (connected to backend)
+- View product details
+- Add/remove items from cart (local state only)
 - Checkout with mock payment
-- Order tracking
 
-### Admin Features
+### Admin Features (UI only — not yet connected to backend)
 - Manage products (CRUD)
-- Track inventory
 - View all orders
 - Update order status
-- Product variants management
 
 ## Database Setup
 
@@ -169,13 +137,12 @@ npm run dev
 
 ## Next Steps
 
-1. Set up MongoDB
-2. Run backend: `npm run dev` (in CartExpress_Backend)
-3. Run frontend: `npm run dev` (in CartExpress_Frontend)
-4. Add sample products to database
-5. Implement JWT authentication
-6. Integrate payment gateway
-7. Deploy to production
+1. Set up MongoDB and update `DATABASE_URL` in `.env`
+2. Seed database with sample products
+3. Implement JWT authentication
+4. Connect Admin and Cart/Checkout pages to backend
+5. Integrate payment gateway
+6. Deploy to production
 
 ## Resources
 
