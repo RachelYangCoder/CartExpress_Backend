@@ -3,8 +3,12 @@
 ## Project Structure
 
 ```
-CartExpress/
-├── CartExpress_Backend/    (Node.js + MongoDB API)
+CartExpress_Backend/
+├── server.js
+├── routes/
+├── controllers/
+├── model/
+├── config/
 └── CartExpress_Frontend/   (React + Vite)
 ```
 
@@ -28,7 +32,7 @@ CartExpress/
 > **Requirements:** Node.js 18+
 
 ```bash
-git clone https://github.com/RachelYangCoder/CartExpress_Backend.git
+git clone -b pablo-wip https://github.com/RachelYangCoder/CartExpress_Backend.git
 cd CartExpress_Backend
 npm install
 npm run dev
