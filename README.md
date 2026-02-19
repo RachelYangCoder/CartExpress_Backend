@@ -25,25 +25,21 @@ CartExpress/
 
 ## Quick Start
 
-> **Requirements:** Node.js and MongoDB installed and running.
+> **Requirements:** Node.js 18+
 
-### Terminal 1 — Backend
 ```bash
+git clone https://github.com/RachelYangCoder/CartExpress_Backend.git
 cd CartExpress_Backend
-npm install   # automatically creates .env from .env.example
-npm run dev
-```
-Runs on `http://localhost:4000`
-
-### Terminal 2 — Frontend
-```bash
-cd CartExpress_Frontend
 npm install
 npm run dev
 ```
-Runs on `http://localhost:3000`
 
-> **No MongoDB?** The backend will still start and print a warning. DB-dependent routes (products, cart, orders) will return errors until MongoDB is running and `DATABASE_URL` is set in `.env`.
+- **Backend** → `http://localhost:4000`
+- **Frontend** → `http://localhost:3000`
+
+`npm install` auto-creates `.env` from `.env.example`. `npm run dev` installs frontend dependencies on first run, then starts both servers.
+
+> **No MongoDB?** The server still starts. DB-dependent routes return errors until MongoDB is running and `DATABASE_URL` is set in `.env`.
 
 ## API Endpoints
 
