@@ -11,17 +11,17 @@ CartExpress/
 ## Features
 
 ### Customer Features
-- Browse and search products
+- Browse and search products (connected to backend)
 - View product details
-- Add to cart & manage quantities
+- Add to cart & manage quantities (local state only)
 - Checkout with mock payment
-- Order history
 
-### Admin Features
-- Manage products (create, edit, delete)
-- Manage inventory
-- View and update orders
-- Order status tracking
+### Admin Features (UI only — not yet connected to backend)
+- Product management UI
+- Order management UI
+
+### Backend API (fully implemented, ready to connect)
+- Full CRUD for products, cart, and orders
 
 ## Quick Start
 
@@ -71,10 +71,10 @@ Runs on `http://localhost:3000`
 ## Database
 
 MongoDB with Mongoose ODM. Models include:
-- User (authentication, profile, roles)
-- Product (details, variants, categories)
-- Cart (items, totals)
-- Order (items, shipping, payment)
+- User, Product, Cart, Order
+- Address, Categories, Inventory, Payments, Reviews
+
+> Authentication is not yet implemented.
 
 ## Technologies
 
