@@ -1,41 +1,61 @@
 ///////////////////////////////
 // DEPENDENCIES
-////////////////////////////////
-// get .env variables
+///////////////////////////////
 require("dotenv").config();
-console.log("DATABASE_URL:", process.env.DATABASE_URL);
-// pull PORT from .env, give default value of 3000
-// pull MONGODB_URL from .env
-const { PORT = 4000, DATABASE_URL } = process.env;
-// import express
 const express = require("express");
-// create application object
+const cors = require("cors");
+const morgan = require("morgan");
+const connectDB = require("./config/db");
+const { errorHandler, notFound } = require("./middleware/errorHandler");
+
 const app = express();
-// import mongoose
-const mongoose = require("mongoose");
+const { PORT = 4000 } = process.env;
 
 ///////////////////////////////
-// DATABASE CONNECTION
-////////////////////////////////
-// Establish Connection
-mongoose.connect(DATABASE_URL);
-// Connection Events
-mongoose.connection
-  .on("open", () => console.log("Your are connected to mongoose"))
-  .on("close", () => console.log("Your are disconnected from mongoose"))
-  .on("error", (error) => console.log(error));
+// DATABASE
+///////////////////////////////
+connectDB();
+
+///////////////////////////////
+// MIDDLEWARE
+///////////////////////////////
+
+// Stripe webhook needs raw body — register BEFORE express.json()
+app.use(
+  "/api/payments/webhook",
+  express.raw({ type: "application/json" })
+);
+
+// Standard middleware
+app.use(cors());
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+if (process.env.NODE_ENV === "development") app.use(morgan("dev"));
 
 ///////////////////////////////
 // ROUTES
-////////////////////////////////
-// create a test route
-app.get("/", (req, res) => {
-  res.send("hello world");
-});
+///////////////////////////////
+app.use("/api/auth",       require("./routes/authRoutes"));
+app.use("/api/products",   require("./routes/productRoutes"));
+app.use("/api/cart",       require("./routes/cartRoutes"));
+app.use("/api/orders",     require("./routes/orderRoutes"));
+app.use("/api/payments",   require("./routes/paymentRoutes"));
+app.use("/api/categories", require("./routes/categoryRoutes"));
+
+// Health check
+app.get("/", (req, res) =>
+  res.json({ success: true, message: "CartExpress API is running 🚀" })
+);
+
+///////////////////////////////
+// ERROR HANDLING (must be last)
+///////////////////////////////
+app.use(notFound);
+app.use(errorHandler);
 
 ///////////////////////////////
 // LISTENER
-////////////////////////////////
-app.listen(PORT, () => console.log(`listening on PORT ${PORT}`));
+///////////////////////////////
+app.listen(PORT, () => console.log(`🚀 Server listening on PORT ${PORT}`));
 
 
