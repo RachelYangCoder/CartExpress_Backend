@@ -1,2 +1,8 @@
 /node_modules
 .env
+backend.log
+frontend.log
+*.pid
+nohup.out
+.DS_Store
+**/.DS_Store

@@ -1,41 +1,57 @@
 ///////////////////////////////
 // DEPENDENCIES
 ////////////////////////////////
-// get .env variables
 require("dotenv").config();
-console.log("DATABASE_URL:", process.env.DATABASE_URL);
-// pull PORT from .env, give default value of 3000
-// pull MONGODB_URL from .env
-const { PORT = 4000, DATABASE_URL } = process.env;
-// import express
 const express = require("express");
-// create application object
+const cors = require("cors");
+const morgan = require("morgan");
+const { connectDB } = require("./config/database");
+
+// Import routes
+const productRoutes = require("./routes/products");
+const cartRoutes = require("./routes/cart");
+const orderRoutes = require("./routes/orders");
+
+///////////////////////////////
+// CONFIG
+////////////////////////////////
+const { PORT = 4000 } = process.env;
 const app = express();
-// import mongoose
-const mongoose = require("mongoose");
+
+///////////////////////////////
+// MIDDLEWARE
+////////////////////////////////
+app.use(cors());
+app.use(morgan("dev"));
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
 ///////////////////////////////
 // DATABASE CONNECTION
 ////////////////////////////////
-// Establish Connection
-mongoose.connect(DATABASE_URL);
-// Connection Events
-mongoose.connection
-  .on("open", () => console.log("Your are connected to mongoose"))
-  .on("close", () => console.log("Your are disconnected from mongoose"))
-  .on("error", (error) => console.log(error));
+connectDB();
 
 ///////////////////////////////
 // ROUTES
 ////////////////////////////////
-// create a test route
 app.get("/", (req, res) => {
-  res.send("hello world");
+  res.json({ message: "CartExpress API" });
+});
+
+app.use("/api/products", productRoutes);
+app.use("/api/cart", cartRoutes);
+app.use("/api/orders", orderRoutes);
+
+// 404 handler
+app.use((req, res) => {
+  res.status(404).json({ success: false, error: "Route not found" });
 });
 
 ///////////////////////////////
 // LISTENER
 ////////////////////////////////
-app.listen(PORT, () => console.log(`listening on PORT ${PORT}`));
+app.listen(PORT, () => {
+  console.log(`\nServer running on http://localhost:${PORT}\n`);
+});
 
 
