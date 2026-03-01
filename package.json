@@ -6,8 +6,8 @@
   "scripts": {
     "start": "node server.js",
     "predev": "cd CartExpress_Frontend && ([ -d node_modules ] || npm install)",
-    "dev": "concurrently --names \"backend,frontend\" --prefix-colors \"cyan,green\" \"nodemon server.js\" \"cd CartExpress_Frontend && npm run dev\"",
-    "postinstall": "[ -f .env ] || cp .env.example .env"
+    "dev": "concurrently --names \"backend,frontend\" --prefix-colors \"cyan,green\" \"nodemon server.js\" \"cd CartExpress_Frontend && npm run dev\""
+
   },
   "keywords": [],
   "author": "",
