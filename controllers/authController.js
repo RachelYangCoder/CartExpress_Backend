@@ -79,3 +79,65 @@ exports.updatePassword = async (req, res, next) => {
     next(err);
   }
 };
+
+// @route  POST /api/auth/make-admin
+// @access Public (DEVELOPMENT ONLY - REMOVE IN PRODUCTION!)
+// @desc   Temporarily promote a user to admin role for testing
+exports.makeAdmin = async (req, res, next) => {
+  try {
+    const { email } = req.body;
+    
+    if (!email) {
+      return res.status(400).json({ success: false, message: "Email is required" });
+    }
+    
+    const user = await User.findOneAndUpdate(
+      { email },
+      { role: "admin" },
+      { new: true, runValidators: true }
+    );
+    
+    if (!user) {
+      return res.status(404).json({ success: false, message: "User not found" });
+    }
+    
+    res.json({ 
+      success: true, 
+      message: `User ${email} is now an admin. Please login again to get updated token.`,
+      data: { user } 
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// @route  POST /api/auth/make-vendor
+// @access Public (DEVELOPMENT ONLY - REMOVE IN PRODUCTION!)
+// @desc   Temporarily promote a user to vendor role for testing
+exports.makeVendor = async (req, res, next) => {
+  try {
+    const { email } = req.body;
+    
+    if (!email) {
+      return res.status(400).json({ success: false, message: "Email is required" });
+    }
+    
+    const user = await User.findOneAndUpdate(
+      { email },
+      { role: "vendor" },
+      { new: true, runValidators: true }
+    );
+    
+    if (!user) {
+      return res.status(404).json({ success: false, message: "User not found" });
+    }
+    
+    res.json({ 
+      success: true, 
+      message: `User ${email} is now a vendor. Please login again to get updated token.`,
+      data: { user } 
+    });
+  } catch (err) {
+    next(err);
+  }
+};
