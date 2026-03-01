@@ -1,142 +1,193 @@
 const Cart = require("../model/cart");
 const Product = require("../model/product_detail");
+const { v4: uuidv4 } = require("uuid");
 
-// Get cart
-exports.getCart = async (req, res) => {
+// Helper: get cart by user or session
+const getCart = async (userId, sessionId) => {
+  if (userId) return Cart.findOne({ userId });
+  return Cart.findOne({ sessionId });
+};
+
+// @route  GET /api/cart
+// @access Public (guest or logged-in)
+exports.getCart = async (req, res, next) => {
   try {
-    const { userId, sessionId } = req.query;
-    
-    const query = userId ? { userId } : { sessionId };
-    let cart = await Cart.findOne(query).populate("items.productId");
+    const userId = req.user?._id || null;
+    const sessionId = req.headers["x-session-id"] || null;
 
-    if (!cart) {
-      return res.json({ success: true, data: null });
-    }
+    const cart = await getCart(userId, sessionId);
+    if (!cart) return res.status(200).json({ success: true, data: { cart: { items: [], total: 0 } } });
 
-    res.json({ success: true, data: cart });
-  } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
+    res.status(200).json({ success: true, data: { cart } });
+  } catch (err) {
+    next(err);
   }
 };
 
-// Add to cart
-exports.addToCart = async (req, res) => {
+// @route  POST /api/cart/items
+// @access Public (guest or logged-in)
+exports.addToCart = async (req, res, next) => {
   try {
-    const { userId, sessionId, productId, variantId, quantity } = req.body;
-    
+    const { productId, variantId, quantity = 1 } = req.body;
+    const userId = req.user?._id || null;
+    let sessionId = req.headers["x-session-id"] || null;
+
+    // Validate product exists and has stock
     const product = await Product.findById(productId);
-    if (!product) {
-      return res.status(404).json({ success: false, error: "Product not found" });
+    if (!product || !product.isActive) {
+      return res.status(404).json({ success: false, message: "Product not found." });
     }
 
-    const query = userId ? { userId } : { sessionId };
-    let cart = await Cart.findOne(query);
+    // Determine price (from variant or base price)
+    let price = product.price;
+    let sku = product.sku;
+    let image = product.thumbnail;
+    if (variantId) {
+      const variant = product.variants.id(variantId);
+      if (!variant) return res.status(404).json({ success: false, message: "Variant not found." });
+      price = variant.price;
+      sku = variant.sku;
+      image = variant.image || image;
+    }
+
+    let cart = await getCart(userId, sessionId);
 
     if (!cart) {
-      cart = new Cart(query);
+      // Generate a session ID for guest carts
+      if (!userId && !sessionId) sessionId = uuidv4();
+      cart = new Cart({
+        userId,
+        sessionId: userId ? null : sessionId,
+        items: [],
+        expiresAt: userId ? null : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days for guests
+      });
     }
 
-    const item = {
-      productId,
-      variantId,
-      name: product.name,
-      sku: product.sku,
-      image: product.images?.[0],
-      price: product.price,
-      quantity: parseInt(quantity) || 1,
-      subtotal: product.price * (parseInt(quantity) || 1),
-    };
-
-    // Check if item already exists
-    const existingItem = cart.items.findIndex(
-      (i) => i.productId.toString() === productId && i.variantId === variantId
+    // Check if item already in cart
+    const existingIdx = cart.items.findIndex(
+      (i) => i.productId.toString() === productId && String(i.variantId) === String(variantId)
     );
 
-    if (existingItem > -1) {
-      cart.items[existingItem].quantity += item.quantity;
-      cart.items[existingItem].subtotal = 
-        cart.items[existingItem].price * cart.items[existingItem].quantity;
+    if (existingIdx > -1) {
+      cart.items[existingIdx].quantity += quantity;
+      cart.items[existingIdx].subtotal = cart.items[existingIdx].price * cart.items[existingIdx].quantity;
     } else {
-      cart.items.push(item);
+      cart.items.push({
+        productId,
+        variantId: variantId || undefined,
+        name: product.name,
+        sku,
+        image,
+        price,
+        quantity,
+        subtotal: price * quantity,
+      });
     }
 
-    // Recalculate totals
-    cart.subtotal = cart.items.reduce((sum, i) => sum + i.subtotal, 0);
-    cart.total = cart.subtotal + (cart.tax || 0) - (cart.discount || 0);
-
     await cart.save();
-    res.json({ success: true, data: cart });
-  } catch (error) {
-    res.status(400).json({ success: false, error: error.message });
+    res.status(200).json({ success: true, data: { cart }, sessionId });
+  } catch (err) {
+    next(err);
   }
 };
 
-// Remove from cart
-exports.removeFromCart = async (req, res) => {
+// @route  PUT /api/cart/items/:itemId
+// @access Public
+exports.updateCartItem = async (req, res, next) => {
   try {
-    const { userId, sessionId, productId } = req.body;
-    
-    const query = userId ? { userId } : { sessionId };
-    const cart = await Cart.findOne(query);
+    const { quantity } = req.body;
+    const userId = req.user?._id || null;
+    const sessionId = req.headers["x-session-id"] || null;
 
-    if (!cart) {
-      return res.status(404).json({ success: false, error: "Cart not found" });
+    const cart = await getCart(userId, sessionId);
+    if (!cart) return res.status(404).json({ success: false, message: "Cart not found." });
+
+    const item = cart.items.id(req.params.itemId);
+    if (!item) return res.status(404).json({ success: false, message: "Item not found in cart." });
+
+    if (quantity <= 0) {
+      item.deleteOne();
+    } else {
+      item.quantity = quantity;
+      item.subtotal = item.price * quantity;
     }
 
-    cart.items = cart.items.filter((i) => i.productId.toString() !== productId);
-    
-    // Recalculate totals
-    cart.subtotal = cart.items.reduce((sum, i) => sum + i.subtotal, 0);
-    cart.total = cart.subtotal + (cart.tax || 0) - (cart.discount || 0);
-
     await cart.save();
-    res.json({ success: true, data: cart });
-  } catch (error) {
-    res.status(400).json({ success: false, error: error.message });
+    res.status(200).json({ success: true, data: { cart } });
+  } catch (err) {
+    next(err);
   }
 };
 
-// Update cart item quantity
-exports.updateCartItem = async (req, res) => {
+// @route  DELETE /api/cart/items/:itemId
+// @access Public
+exports.removeFromCart = async (req, res, next) => {
   try {
-    const { userId, sessionId, productId, quantity } = req.body;
-    
-    const query = userId ? { userId } : { sessionId };
-    const cart = await Cart.findOne(query);
+    const userId = req.user?._id || null;
+    const sessionId = req.headers["x-session-id"] || null;
 
-    if (!cart) {
-      return res.status(404).json({ success: false, error: "Cart not found" });
-    }
+    const cart = await getCart(userId, sessionId);
+    if (!cart) return res.status(404).json({ success: false, message: "Cart not found." });
 
-    const item = cart.items.find((i) => i.productId.toString() === productId);
-    if (!item) {
-      return res.status(404).json({ success: false, error: "Item not in cart" });
-    }
-
-    item.quantity = parseInt(quantity);
-    item.subtotal = item.price * item.quantity;
-
-    // Recalculate totals
-    cart.subtotal = cart.items.reduce((sum, i) => sum + i.subtotal, 0);
-    cart.total = cart.subtotal + (cart.tax || 0) - (cart.discount || 0);
-
+    cart.items = cart.items.filter((i) => i._id.toString() !== req.params.itemId);
     await cart.save();
-    res.json({ success: true, data: cart });
-  } catch (error) {
-    res.status(400).json({ success: false, error: error.message });
+    res.status(200).json({ success: true, data: { cart } });
+  } catch (err) {
+    next(err);
   }
 };
 
-// Clear cart
-exports.clearCart = async (req, res) => {
+// @route  DELETE /api/cart
+// @access Public
+exports.clearCart = async (req, res, next) => {
   try {
-    const { userId, sessionId } = req.body;
-    
-    const query = userId ? { userId } : { sessionId };
-    await Cart.deleteOne(query);
+    const userId = req.user?._id || null;
+    const sessionId = req.headers["x-session-id"] || null;
 
-    res.json({ success: true, message: "Cart cleared" });
-  } catch (error) {
-    res.status(400).json({ success: false, error: error.message });
+    await Cart.findOneAndDelete(userId ? { userId } : { sessionId });
+    res.status(200).json({ success: true, message: "Cart cleared." });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// @route  POST /api/cart/merge
+// @access Private — merges guest cart into user cart on login
+exports.mergeCart = async (req, res, next) => {
+  try {
+    const { sessionId } = req.body;
+    const userId = req.user._id;
+
+    const guestCart = await Cart.findOne({ sessionId });
+    if (!guestCart) return res.status(200).json({ success: true, message: "No guest cart to merge." });
+
+    let userCart = await Cart.findOne({ userId });
+    if (!userCart) {
+      guestCart.userId = userId;
+      guestCart.sessionId = null;
+      guestCart.expiresAt = null;
+      await guestCart.save();
+      return res.status(200).json({ success: true, data: { cart: guestCart } });
+    }
+
+    // Merge items
+    for (const guestItem of guestCart.items) {
+      const existingIdx = userCart.items.findIndex(
+        (i) => i.productId.toString() === guestItem.productId.toString()
+      );
+      if (existingIdx > -1) {
+        userCart.items[existingIdx].quantity += guestItem.quantity;
+        userCart.items[existingIdx].subtotal =
+          userCart.items[existingIdx].price * userCart.items[existingIdx].quantity;
+      } else {
+        userCart.items.push(guestItem);
+      }
+    }
+
+    await userCart.save();
+    await guestCart.deleteOne();
+    res.status(200).json({ success: true, data: { cart: userCart } });
+  } catch (err) {
+    next(err);
   }
 };

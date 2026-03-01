@@ -7,7 +7,7 @@ const paymentSchema = new Schema(
     orderId: { type: Schema.Types.ObjectId, ref: "Order", required: true, index: true },
     userId:  { type: Schema.Types.ObjectId, ref: "User",  required: true, index: true },
     amount:  { type: Number, required: true },
-    currency:{ type: String, default: "usd", uppercase: true },
+    currency:{ type: String, default: "cad", uppercase: true },
     paymentMethod: {
       type: String,
       enum: ["credit_card", "debit_card", "paypal", "stripe", "apple_pay", "google_pay"],

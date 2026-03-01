@@ -25,7 +25,6 @@ const cartSchema = new Schema(
     discount:  { type: Number, default: 0 },
     total:     { type: Number, default: 0 },
     couponCode:{ type: String },
-    expiresAt: { type: Date, index: true },
   },
   { timestamps: true }
 );
