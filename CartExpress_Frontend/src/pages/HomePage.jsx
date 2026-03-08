@@ -16,7 +16,7 @@ export default function HomePage({ onSelectProduct }) {
     try {
       setLoading(true)
       const response = await getProducts({ search })
-      setProducts(response.data.data || [])
+      setProducts(response.data.data?.products || response.data.data || [])
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to load products')
       console.error('Failed to load products:', err)
