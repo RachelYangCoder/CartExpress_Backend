@@ -155,10 +155,10 @@ npm run dev
 1. Wire up `CheckoutPage.jsx` to `POST /api/orders`
 2. Add image URL support to the Admin product form
 3. UI polish — product card images, mobile layout
-4. Deploy frontend to Vercel or Netlify
-5. Remove `make-admin` and `make-vendor` endpoints before production
-6. Add customer-facing login/register UI — currently only the Admin page has auth
-7. Sync cart to backend per user — cart is currently local state only; logged-in customers can't see their cart across devices or retrieve order history
+4. Add customer-facing login/register UI — currently only the Admin page has auth
+5. Sync cart to backend per user — cart is currently local state only; logged-in customers can't see their cart across devices or retrieve order history
+6. Remove `make-admin` and `make-vendor` endpoints before production
+7. Deploy frontend to Vercel or Netlify
 
 ---
 

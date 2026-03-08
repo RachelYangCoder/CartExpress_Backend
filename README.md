@@ -132,7 +132,16 @@ The CSS structure is in place but the design needs work:
 - Checkout page layout
 - Mobile responsiveness
 
-### 4. Deploy Frontend to Production
+### 4. Customer Login / Register UI
+Currently only the Admin page has auth. Customers need a login/register flow to access order history and sync their cart across devices.
+
+### 5. Sync Cart to Backend
+Cart is currently stored in `localStorage` only. Wiring it to `POST /api/cart/add` etc. would let logged-in customers persist their cart across devices and sessions.
+
+### 6. Remove Dev-Only Endpoints Before Production
+`POST /api/auth/make-admin` and `POST /api/auth/make-vendor` are open with no auth — remove them before going live.
+
+### 7. Deploy Frontend to Production
 The backend is already on Render. For the frontend, use **Vercel** (recommended) or **Netlify**:
 ```bash
 cd CartExpress_Frontend
