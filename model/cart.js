@@ -33,10 +33,9 @@ const cartSchema = new Schema(
 cartSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
 
 // Auto-recalculate totals before save
-cartSchema.pre("save", function (next) {
+cartSchema.pre("save", async function () {
   this.subtotal = this.items.reduce((sum, item) => sum + item.subtotal, 0);
   this.total = this.subtotal + this.tax - this.discount;
-  next();
 });
 
 module.exports = mongoose.model("Cart", cartSchema);
