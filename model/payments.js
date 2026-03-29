@@ -4,7 +4,7 @@ const { Schema } = mongoose;
 
 const paymentSchema = new Schema(
   {
-    orderId: { type: Schema.Types.ObjectId, ref: "Order", required: true, index: true },
+    orderId: { type: Schema.Types.ObjectId, ref: "Order", required: false, default: null, index: true },
     userId:  { type: Schema.Types.ObjectId, ref: "User",  required: true, index: true },
     amount:  { type: Number, required: true },
     currency:{ type: String, default: "cad", uppercase: true },

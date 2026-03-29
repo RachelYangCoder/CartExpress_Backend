@@ -2,26 +2,47 @@ const Order = require("../model/orders");
 const Cart = require("../model/cart");
 const Product = require("../model/product_detail");
 const InventoryLog = require("../model/inventory");
+const Payment = require("../model/payments");
 
 // @route  POST /api/orders
 // @access Private
 exports.createOrder = async (req, res, next) => {
   try {
-    const { shippingAddress, billingAddress, paymentMethod, customerNotes, couponCode, items: bodyItems, tax: bodyTax } = req.body;
+    const {
+      shippingAddress, billingAddress, paymentMethod, customerNotes, couponCode,
+      items: bodyItems, tax: bodyTax,
+      stripePaymentIntentId,  // provided by frontend after confirmCardPayment succeeds
+    } = req.body;
     const userId = req.user._id;
 
-    // Prefer DB cart; fall back to items sent directly in the request body
+    // ── Verify payment first ──────────────────────────────────────────────────
+    // Look up the Payment record created during create-intent
+    const pendingPayment = stripePaymentIntentId
+      ? await Payment.findOne({ stripePaymentIntentId, userId })
+      : null;
+
+    if (stripePaymentIntentId && !pendingPayment) {
+      return res.status(400).json({ success: false, message: "Payment record not found or does not belong to this user." });
+    }
+
+    // Verify the PaymentIntent status directly with Stripe — never trust the client alone
+    if (stripePaymentIntentId) {
+      const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
+      const intent = await stripe.paymentIntents.retrieve(stripePaymentIntentId);
+      if (intent.status !== "succeeded") {
+        return res.status(402).json({ success: false, message: `Payment not confirmed. Stripe status: ${intent.status}` });
+      }
+    }
+
+    // ── Resolve items ─────────────────────────────────────────────────────────
     const dbCart = await Cart.findOne({ userId });
     const usingDbCart = dbCart && dbCart.items.length > 0;
-
-    // Resolve the item list from whichever source is available
     const sourceItems = usingDbCart ? dbCart.items : bodyItems;
 
     if (!sourceItems || sourceItems.length === 0) {
       return res.status(400).json({ success: false, message: "No items to order." });
     }
 
-    // Verify stock and resolve live product data for every item
     const resolvedItems = [];
     for (const item of sourceItems) {
       const product = await Product.findById(item.productId);
@@ -31,7 +52,7 @@ exports.createOrder = async (req, res, next) => {
       if (product.stockQuantity < item.quantity) {
         return res.status(400).json({ success: false, message: `Insufficient stock for ${product.name}.` });
       }
-      const price = usingDbCart ? item.price : product.price; // trust DB cart price; re-anchor body price to live price
+      const price = usingDbCart ? item.price : product.price;
       const subtotal = price * item.quantity;
       resolvedItems.push({
         productId: product._id,
@@ -47,12 +68,15 @@ exports.createOrder = async (req, res, next) => {
       });
     }
 
-    // Compute totals
-    const subtotal = usingDbCart ? dbCart.subtotal : resolvedItems.reduce((sum, i) => sum + i.subtotal, 0);
+    // ── Compute totals ────────────────────────────────────────────────────────
+    const subtotal = usingDbCart
+      ? dbCart.subtotal
+      : resolvedItems.reduce((sum, i) => sum + i.subtotal, 0);
     const tax      = usingDbCart ? dbCart.tax      : (typeof bodyTax === "number" ? bodyTax : 0);
     const discount = usingDbCart ? dbCart.discount : 0;
     const total    = usingDbCart ? dbCart.total    : Math.max(0, subtotal + tax - discount);
 
+    // ── Create order — already paid if payment was provided ───────────────────
     const order = await Order.create({
       userId,
       items: resolvedItems,
@@ -63,12 +87,24 @@ exports.createOrder = async (req, res, next) => {
       total,
       shippingAddress,
       billingAddress: billingAddress || shippingAddress,
-      paymentMethod,
+      paymentMethod: paymentMethod || "stripe",
       customerNotes,
       couponCode,
+      paymentStatus:  pendingPayment ? "paid"       : "pending",
+      status:         pendingPayment ? "processing" : "pending",
+      paymentId:      pendingPayment ? pendingPayment._id : undefined,
     });
 
-    // Deduct stock and log inventory
+    // ── Link Payment record back to the new order ─────────────────────────────
+    if (pendingPayment) {
+      await Payment.findByIdAndUpdate(pendingPayment._id, {
+        orderId: order._id,
+        status:  "completed",
+        paidAt:  new Date(),
+      });
+    }
+
+    // ── Deduct stock and log inventory ────────────────────────────────────────
     for (const item of resolvedItems) {
       const product = await Product.findById(item.productId);
       const previousStock = product.stockQuantity;
@@ -88,7 +124,6 @@ exports.createOrder = async (req, res, next) => {
       });
     }
 
-    // Clear the DB cart if that was the source
     if (usingDbCart) {
       await Cart.findOneAndDelete({ userId });
     }

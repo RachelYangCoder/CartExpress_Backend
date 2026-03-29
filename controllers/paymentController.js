@@ -4,40 +4,60 @@ const Payment = require("../model/payments");
 
 // @route  POST /api/payments/create-intent
 // @access Private
-// Creates a Stripe PaymentIntent and returns the client_secret to the frontend
+// Creates a Stripe PaymentIntent from cart items before an order exists.
+// Payload: { items: [{ productId, quantity, variantId? }], tax?: number }
+// Returns: { clientSecret, paymentId, amount }
 exports.createPaymentIntent = async (req, res, next) => {
   try {
-    const { orderId } = req.body;
+    const { items, tax = 0 } = req.body;
+    const userId = req.user._id;
 
-    const order = await Order.findById(orderId);
-    if (!order) return res.status(404).json({ success: false, message: "Order not found." });
-
-    if (order.userId.toString() !== req.user._id.toString()) {
-      return res.status(403).json({ success: false, message: "Access denied." });
+    if (!items || items.length === 0) {
+      return res.status(400).json({ success: false, message: "No items provided." });
     }
 
-    if (order.paymentStatus === "paid") {
-      return res.status(400).json({ success: false, message: "Order already paid." });
+    // Resolve each item against the live product — never trust client-sent prices
+    const Product = require("../model/product_detail");
+    let subtotal = 0;
+    for (const item of items) {
+      const product = await Product.findById(item.productId);
+      if (!product || !product.isActive) {
+        return res.status(400).json({ success: false, message: `Product not found: ${item.productId}.` });
+      }
+      if (product.stockQuantity < item.quantity) {
+        return res.status(400).json({ success: false, message: `Insufficient stock for ${product.name}.` });
+      }
+
+      let price = product.price;
+      if (item.variantId) {
+        const variant = product.variants.id(item.variantId);
+        if (!variant) return res.status(400).json({ success: false, message: "Variant not found." });
+        price = variant.price;
+      }
+
+      subtotal += price * item.quantity;
     }
 
-    // Amount in cents
-    const amountInCents = Math.round(order.total * 100);
+    const taxAmount = typeof tax === "number" ? tax : 0;
+    const total = Math.max(0, subtotal + taxAmount);
+    const amountInCents = Math.round(total * 100);
 
+    if (amountInCents < 50) {
+      return res.status(400).json({ success: false, message: "Order total is too low to process." });
+    }
+
+    // Create the PaymentIntent — no orderId yet, order is created after payment succeeds
     const paymentIntent = await stripe.paymentIntents.create({
       amount: amountInCents,
       currency: "usd",
-      metadata: {
-        orderId: orderId.toString(),
-        userId: req.user._id.toString(),
-        orderNumber: order.orderNumber,
-      },
+      metadata: { userId: userId.toString() },
     });
 
-    // Create a pending Payment record
+    // Store a pending Payment record with no orderId — it gets linked when the order is created
     const payment = await Payment.create({
-      orderId,
-      userId: req.user._id,
-      amount: order.total,
+      orderId: null,
+      userId,
+      amount: total,
       currency: "usd",
       paymentMethod: "stripe",
       paymentGateway: "stripe",
@@ -50,6 +70,7 @@ exports.createPaymentIntent = async (req, res, next) => {
       data: {
         clientSecret: paymentIntent.client_secret,
         paymentId: payment._id,
+        amount: total,
       },
     });
   } catch (err) {
@@ -75,8 +96,10 @@ exports.stripeWebhook = async (req, res) => {
     switch (event.type) {
       case "payment_intent.succeeded": {
         const intent = event.data.object;
-        const { orderId } = intent.metadata;
 
+        // Mark the Payment record as completed.
+        // The order is created by the frontend immediately after confirmCardPayment
+        // resolves, so we just keep this record up to date as a safety net.
         await Payment.findOneAndUpdate(
           { stripePaymentIntentId: intent.id },
           {
@@ -91,10 +114,15 @@ exports.stripeWebhook = async (req, res) => {
           }
         );
 
-        await Order.findByIdAndUpdate(orderId, {
-          paymentStatus: "paid",
-          status: "processing",
-        });
+        // If an orderId was already linked (e.g. order was created before webhook fired),
+        // update its payment status too
+        const linkedPayment = await Payment.findOne({ stripePaymentIntentId: intent.id });
+        if (linkedPayment?.orderId) {
+          await Order.findByIdAndUpdate(linkedPayment.orderId, {
+            paymentStatus: "paid",
+            status: "processing",
+          });
+        }
         break;
       }
 
