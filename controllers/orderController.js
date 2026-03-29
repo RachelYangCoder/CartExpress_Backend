@@ -7,47 +7,60 @@ const InventoryLog = require("../model/inventory");
 // @access Private
 exports.createOrder = async (req, res, next) => {
   try {
-    const { shippingAddress, billingAddress, paymentMethod, customerNotes, couponCode } = req.body;
+    const { shippingAddress, billingAddress, paymentMethod, customerNotes, couponCode, items: bodyItems, tax: bodyTax } = req.body;
     const userId = req.user._id;
 
-    const cart = await Cart.findOne({ userId });
-    if (!cart || cart.items.length === 0) {
-      return res.status(400).json({ success: false, message: "Cart is empty." });
+    // Prefer DB cart; fall back to items sent directly in the request body
+    const dbCart = await Cart.findOne({ userId });
+    const usingDbCart = dbCart && dbCart.items.length > 0;
+
+    // Resolve the item list from whichever source is available
+    const sourceItems = usingDbCart ? dbCart.items : bodyItems;
+
+    if (!sourceItems || sourceItems.length === 0) {
+      return res.status(400).json({ success: false, message: "No items to order." });
     }
 
-    // Verify stock for all items
-    for (const item of cart.items) {
+    // Verify stock and resolve live product data for every item
+    const resolvedItems = [];
+    for (const item of sourceItems) {
       const product = await Product.findById(item.productId);
-      if (!product || product.stockQuantity < item.quantity) {
-        return res.status(400).json({
-          success: false,
-          message: `Insufficient stock for ${item.name}.`,
-        });
+      if (!product || !product.isActive) {
+        return res.status(400).json({ success: false, message: `Product not found: ${item.name || item.productId}.` });
       }
+      if (product.stockQuantity < item.quantity) {
+        return res.status(400).json({ success: false, message: `Insufficient stock for ${product.name}.` });
+      }
+      const price = usingDbCart ? item.price : product.price; // trust DB cart price; re-anchor body price to live price
+      const subtotal = price * item.quantity;
+      resolvedItems.push({
+        productId: product._id,
+        variantId: item.variantId || undefined,
+        name: product.name,
+        sku: item.sku || product.sku,
+        image: item.image || product.thumbnail,
+        price,
+        quantity: item.quantity,
+        tax: 0,
+        subtotal,
+        total: subtotal,
+      });
     }
 
-    // Build order items
-    const orderItems = cart.items.map((item) => ({
-      productId: item.productId,
-      variantId: item.variantId,
-      name: item.name,
-      sku: item.sku,
-      image: item.image,
-      price: item.price,
-      quantity: item.quantity,
-      tax: 0, // extend with real tax calc if needed
-      subtotal: item.subtotal,
-      total: item.subtotal,
-    }));
+    // Compute totals
+    const subtotal = usingDbCart ? dbCart.subtotal : resolvedItems.reduce((sum, i) => sum + i.subtotal, 0);
+    const tax      = usingDbCart ? dbCart.tax      : (typeof bodyTax === "number" ? bodyTax : 0);
+    const discount = usingDbCart ? dbCart.discount : 0;
+    const total    = usingDbCart ? dbCart.total    : Math.max(0, subtotal + tax - discount);
 
     const order = await Order.create({
       userId,
-      items: orderItems,
-      subtotal: cart.subtotal,
-      tax: cart.tax,
+      items: resolvedItems,
+      subtotal,
+      tax,
       shippingCost: 0,
-      discount: cart.discount,
-      total: cart.total,
+      discount,
+      total,
       shippingAddress,
       billingAddress: billingAddress || shippingAddress,
       paymentMethod,
@@ -56,7 +69,7 @@ exports.createOrder = async (req, res, next) => {
     });
 
     // Deduct stock and log inventory
-    for (const item of cart.items) {
+    for (const item of resolvedItems) {
       const product = await Product.findById(item.productId);
       const previousStock = product.stockQuantity;
       product.stockQuantity -= item.quantity;
@@ -75,8 +88,10 @@ exports.createOrder = async (req, res, next) => {
       });
     }
 
-    // Clear cart
-    await Cart.findOneAndDelete({ userId });
+    // Clear the DB cart if that was the source
+    if (usingDbCart) {
+      await Cart.findOneAndDelete({ userId });
+    }
 
     res.status(201).json({ success: true, data: { order } });
   } catch (err) {

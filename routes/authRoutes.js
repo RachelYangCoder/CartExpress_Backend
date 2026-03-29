@@ -15,8 +15,10 @@ router.post("/register", register);
 router.post("/login", login);
 
 // DEVELOPMENT ONLY - REMOVE IN PRODUCTION
-router.post("/make-admin", makeAdmin);
-router.post("/make-vendor", makeVendor);
+if (process.env.NODE_ENV !== "production") {
+  router.post("/make-admin", makeAdmin);
+  router.post("/make-vendor", makeVendor);
+}
 
 // Protected routes
 router.get("/me", protect, getMe);
