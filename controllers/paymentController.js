@@ -166,8 +166,40 @@ exports.stripeWebhook = async (req, res) => {
   }
 };
 
-// @route  GET /api/payments/:orderId
+// @route  POST /api/payments/verify-intent
 // @access Private
+// Accepts a stripePaymentIntentId and returns { success: true/false }
+exports.verifyPaymentIntent = async (req, res, next) => {
+  try {
+    const { stripePaymentIntentId } = req.body;
+
+    if (!stripePaymentIntentId) {
+      return res.status(400).json({ success: false, message: "stripePaymentIntentId is required." });
+    }
+
+    // Confirm directly with Stripe — never trust client-reported status
+    const intent = await stripe.paymentIntents.retrieve(stripePaymentIntentId);
+
+    // Also verify the payment record belongs to this user
+    const payment = await Payment.findOne({
+      stripePaymentIntentId,
+      userId: req.user._id,
+    });
+
+    if (!payment) {
+      return res.status(403).json({ success: false, message: "Payment not found or access denied." });
+    }
+
+    const succeeded = intent.status === "succeeded";
+    res.status(200).json({ success: succeeded });
+  } catch (err) {
+    // Stripe throws if the intent ID doesn't exist
+    if (err.type === "StripeInvalidRequestError") {
+      return res.status(400).json({ success: false, message: "Invalid payment intent ID." });
+    }
+    next(err);
+  }
+};
 exports.getPaymentByOrder = async (req, res, next) => {
   try {
     const payment = await Payment.findOne({ orderId: req.params.orderId });

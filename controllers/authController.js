@@ -55,6 +55,30 @@ exports.login = async (req, res, next) => {
   }
 };
 
+// @route  POST /api/auth/check-login
+// @access Public
+// Accepts a JWT token in the body and returns the corresponding user if valid.
+exports.checkLogin = async (req, res) => {
+  try {
+    const { token } = req.body;
+    if (!token) {
+      return res.status(400).json({ success: false, message: "Token is required." });
+    }
+
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const user = await User.findById(decoded.id).select("-password");
+
+    if (!user || !user.isActive) {
+      return res.status(401).json({ success: false, message: "User not found or deactivated." });
+    }
+
+    res.status(200).json({ success: true, data: { user } });
+  } catch (err) {
+    // Covers JsonWebTokenError and TokenExpiredError
+    res.status(401).json({ success: false, message: "Token invalid or expired." });
+  }
+};
+
 // @route  GET /api/auth/me
 // @access Private
 exports.getMe = async (req, res) => {

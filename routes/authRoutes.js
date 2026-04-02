@@ -2,7 +2,8 @@ const express = require("express");
 const router = express.Router();
 const { 
   register, 
-  login, 
+  login,
+  checkLogin,
   getMe, 
   updatePassword,
   makeAdmin,    // Add this
@@ -13,8 +14,9 @@ const { protect } = require("../middleware/auth");
 // Public routes
 router.post("/register", register);
 router.post("/login", login);
+router.post("/check-login", checkLogin);
 
-// DEVELOPMENT ONLY - REMOVE IN PRODUCTION
+// DEVELOPMENT ONLY — blocked in production
 if (process.env.NODE_ENV !== "production") {
   router.post("/make-admin", makeAdmin);
   router.post("/make-vendor", makeVendor);

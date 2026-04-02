@@ -1,7 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const {
-  createPaymentIntent, stripeWebhook, getPaymentByOrder,
+  createPaymentIntent, stripeWebhook, getPaymentByOrder, verifyPaymentIntent,
 } = require("../controllers/paymentController");
 const { protect } = require("../middleware/auth");
 
@@ -9,6 +9,7 @@ const { protect } = require("../middleware/auth");
 router.post("/webhook", stripeWebhook);
 
 router.post("/create-intent", protect, createPaymentIntent);
+router.post("/verify-intent", protect, verifyPaymentIntent);
 router.get("/:orderId", protect, getPaymentByOrder);
 
 module.exports = router;
